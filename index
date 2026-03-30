@@ -1,0 +1,1928 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sala do Consumidor v8.6 | PROCON Rio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    * { font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+    .card-hover { transition: all 0.3s cubic-bezier(0.4,0,0.2,1); }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+    .tab-active { border-left: 4px solid #3b82f6; background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, transparent 100%); color: #3b82f6; font-weight: 600; }
+    .eixo-card { background: linear-gradient(135deg, rgba(30,41,59,0.8) 0%, rgba(15,23,42,0.9) 100%); border: 1px solid rgba(71,85,105,0.5); }
+    .metric-sim { color: #10b981; }
+    .metric-nao { color: #ef4444; }
+    .metric-total { color: #f59e0b; }
+    .progress-bar { height: 8px; background: #334155; border-radius: 4px; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+    .progress-fill.sim { background: linear-gradient(90deg, #10b981, #34d399); }
+    .progress-fill.nao { background: linear-gradient(90deg, #ef4444, #f87171); }
+    /* Cards de perguntas com fundo mais claro e maior contraste */
+    .question-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 16px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    .question-card:hover {
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+    }
+    .question-card .sim-count { color: #10b981; font-weight: bold; }
+    .question-card .nao-count { color: #f87171; font-weight: bold; }
+    .filter-select {
+      background-color: #1e293b; border: 1px solid #475569; border-radius: 12px;
+      padding: 0.5rem 2rem 0.5rem 1rem; font-size: 0.875rem; color: #f1f5f9;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .filter-select:hover { border-color: #3b82f6; background-color: #0f172a; }
+    .filter-select:focus { outline: none; border-color: #3b82f6; }
+    .date-input {
+      background-color: #1e293b; border: 1px solid #475569; border-radius: 12px;
+      padding: 0.5rem 1rem; font-size: 0.875rem; color: #f1f5f9;
+      transition: all 0.2s;
+    }
+    .date-input:hover, .date-input:focus { border-color: #3b82f6; outline: none; background-color: #0f172a; }
+    .filter-icon-btn { cursor: pointer; transition: color 0.2s; }
+    .filter-icon-btn:hover { color: #3b82f6; }
+    @media (max-width: 1023px) {
+      #sidebar { position: fixed; left: 0; top: 0; z-index: 50; transform: translateX(-100%); transition: transform 0.3s; }
+      #sidebar.open { transform: translateX(0); }
+      .header-filters { flex-wrap: wrap; gap: 0.5rem; }
+      .header-filters > div { flex: 1 1 auto; min-width: 120px; }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+
+<div class="flex h-screen overflow-hidden">
+  <!-- Sidebar -->
+  <div id="sidebar" class="w-72 bg-slate-900 border-r border-slate-800 flex flex-col">
+    <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+      <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
+        <i class="fas fa-shield-alt"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold">Sala do Consumidor</h1>
+        <p class="text-xs text-blue-400">PROCON Rio • v8.6</p>
+      </div>
+    </div>
+
+    <div id="uploadContainer" class="px-4 pt-6">
+      <div id="upload-area" class="border-2 border-dashed border-slate-700 hover:border-blue-500 rounded-2xl p-6 text-center cursor-pointer transition-all">
+        <i class="fas fa-cloud-upload-alt text-4xl text-slate-400 mb-3"></i>
+        <p class="font-medium text-sm">Importar Planilha Excel</p>
+        <p class="text-xs text-slate-500 mt-1">Arraste ou clique para selecionar</p>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+      </div>
+    </div>
+    <div id="uploadedInfo" class="hidden px-4 pt-6">
+      <div class="bg-emerald-900/30 border border-emerald-700 rounded-2xl p-4 flex items-center gap-3">
+        <i class="fas fa-check-circle text-xl text-emerald-400"></i>
+        <div class="flex-1 text-sm">
+          <p class="font-medium text-emerald-300">Planilha carregada</p>
+          <p id="fileNameDisplay" class="text-xs text-emerald-400 mt-1 truncate"></p>
+        </div>
+        <button onclick="resetUpload()" class="text-xs px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 rounded-lg transition-colors">
+          <i class="fas fa-exchange-alt"></i>
+        </button>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-6 overflow-y-auto">
+      <a onclick="switchTab(0)" class="tab flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 mb-1 cursor-pointer transition-all tab-active" id="tab-0">
+        <i class="fas fa-chart-pie w-5"></i><span>Dashboard Geral</span>
+      </a>
+      <a onclick="switchTab(1)" class="tab flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 mb-1 cursor-pointer transition-all" id="tab-1">
+        <i class="fas fa-calendar-alt w-5"></i><span>Mapeamento</span>
+      </a>
+      <a onclick="switchTab(2)" class="tab flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 mb-1 cursor-pointer transition-all" id="tab-2">
+        <i class="fas fa-dice w-5"></i><span>BET's • Apostas</span>
+      </a>
+      <a onclick="switchTab(3)" class="tab flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 mb-1 cursor-pointer transition-all" id="tab-3">
+        <i class="fas fa-building w-5"></i><span>Sala Interno</span>
+      </a>
+      <a onclick="switchTab(4)" class="tab flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 mb-1 cursor-pointer transition-all" id="tab-4">
+        <i class="fas fa-users w-5"></i><span>Produtividade por Agente</span>
+      </a>
+      <a onclick="switchTab(5)" class="tab flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 mb-1 cursor-pointer transition-all" id="tab-5">
+        <i class="fas fa-layer-group w-5"></i><span>Análise por Eixo</span>
+      </a>
+    </nav>
+    <!-- Botão "Exportar Relatório PDF (Geral)" removido conforme solicitado -->
+  </div>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <header class="bg-slate-900 border-b border-slate-800 px-4 md:px-6 py-3 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+      <div class="flex items-center gap-4">
+        <button onclick="toggleSidebar()" class="lg:hidden text-xl p-2 hover:bg-slate-800 rounded-lg">
+          <i class="fas fa-bars"></i>
+        </button>
+        <h2 id="pageTitle" class="text-lg md:text-xl font-semibold">Dashboard Geral</h2>
+        <!-- Botão PDF específico da aba -->
+        <button id="tabPdfBtn" onclick="generateCurrentTabPDF()" class="bg-red-700 hover:bg-red-600 text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 shadow-md transition-colors">
+          <i class="fas fa-file-pdf"></i> Exportar PDF desta aba
+        </button>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap header-filters">
+        <div class="flex items-center gap-2 bg-slate-800 rounded-xl px-3 py-2">
+          <i class="fas fa-calendar-alt text-slate-400 text-sm filter-icon-btn" onclick="document.getElementById('filterDataInicio').showPicker?.() || document.getElementById('filterDataInicio').click()"></i>
+          <input type="date" id="filterDataInicio" onchange="applyFilters()" class="date-input" placeholder="Data inicial">
+        </div>
+        <div class="flex items-center gap-2 bg-slate-800 rounded-xl px-3 py-2">
+          <i class="fas fa-calendar-check text-slate-400 text-sm filter-icon-btn" onclick="document.getElementById('filterDataFim').showPicker?.() || document.getElementById('filterDataFim').click()"></i>
+          <input type="date" id="filterDataFim" onchange="applyFilters()" class="date-input" placeholder="Data final">
+        </div>
+        <div class="flex items-center gap-2 bg-slate-800 rounded-xl px-3 py-2">
+          <i class="fas fa-map-marker-alt text-slate-400 text-sm"></i>
+          <select id="filterSala" onchange="applyFilters()" class="filter-select bg-slate-800 text-sm outline-none">
+            <option value="">Todas as salas</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2 bg-slate-800 rounded-xl px-3 py-2">
+          <i class="fas fa-filter text-slate-400 text-sm"></i>
+          <select id="filterEixo" onchange="applyFilters()" class="filter-select bg-slate-800 text-sm outline-none">
+            <option value="">Todos os eixos</option>
+            <option value="diario">Lançamento Diário</option>
+            <option value="bets">BET's</option>
+            <option value="interno">Sala Interno</option>
+          </select>
+        </div>
+        <button onclick="clearFilters()" class="bg-slate-700 hover:bg-slate-600 transition-colors rounded-xl px-4 py-2 text-sm flex items-center gap-2">
+          <i class="fas fa-eraser"></i> Limpar Filtros
+        </button>
+      </div>
+    </header>
+
+    <div class="flex-1 overflow-auto p-4 md:p-6" id="contentArea">
+      <!-- TAB 0: Dashboard Geral (mesmo HTML original) -->
+      <div id="content-0">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 grid-responsive-4" id="metricsCards"></div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 grid-responsive-3">
+          <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 text-center">
+            <p class="text-sm text-slate-400 mb-2">Total de Respostas SIM</p>
+            <p class="text-4xl font-bold metric-sim" id="totalSim">0</p>
+            <div class="mt-2 text-xs text-slate-400">
+              <div>📋 Lançamento Diário: <span id="simDiario">0</span></div>
+              <div>🎲 BET's: <span id="simBets">0</span></div>
+              <div>🏢 Sala Interno: <span id="simInterno">0</span></div>
+            </div>
+            <p class="text-xs text-slate-500 mt-1" id="pctSim">0% do total</p>
+          </div>
+          <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 text-center">
+            <p class="text-sm text-slate-400 mb-2">Total de Respostas NÃO</p>
+            <p class="text-4xl font-bold metric-nao" id="totalNao">0</p>
+            <div class="mt-2 text-xs text-slate-400">
+              <div>📋 Lançamento Diário: <span id="naoDiario">0</span></div>
+              <div>🎲 BET's: <span id="naoBets">0</span></div>
+              <div>🏢 Sala Interno: <span id="naoInterno">0</span></div>
+            </div>
+            <p class="text-xs text-slate-500 mt-1" id="pctNao">0% do total</p>
+          </div>
+          <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 text-center">
+            <p class="text-sm text-slate-400 mb-2">Total de Respostas</p>
+            <p class="text-4xl font-bold metric-total" id="totalAtendimentos">0</p>
+            <p class="text-xs text-slate-500 mt-1">fichas/respostas</p>
+          </div>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-th-large text-blue-400"></i>Conhecimento por Eixo (% SIM)</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 grid-responsive-3" id="eixosCards"></div>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-lightbulb text-amber-400"></i>Insights e Alertas</h3>
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 grid-responsive-3" id="insightsCards"></div>
+        </div>
+        <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+          <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-bar text-emerald-400"></i>Distribuição Geral (SIM vs NÃO por Eixo)</h3>
+          <div style="height:350px"><canvas id="chartGeral"></canvas></div>
+        </div>
+      </div>
+
+      <!-- TAB 1: Lançamentos Diários -->
+      <div id="content-1" class="hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 grid-responsive-3">
+          <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white">
+            <p class="text-sm opacity-80">Total de Fichas</p>
+            <p class="text-4xl font-bold mt-2" id="totalFichasDiario">0</p>
+          </div>
+          <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+            <p class="text-sm text-slate-400">Agentes Ativos</p>
+            <p class="text-4xl font-bold text-emerald-400 mt-2" id="agentesDiario">0</p>
+            <p class="text-xs text-slate-500 mt-2">com fichas registradas</p>
+          </div>
+          <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+            <p class="text-sm text-slate-400">Dias Ativos</p>
+            <p class="text-4xl font-bold text-amber-400 mt-2" id="diasAtivos">0</p>
+            <p class="text-xs text-slate-500 mt-2" id="mediaDiariaLabel">0 fichas/dia em média</p>
+          </div>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-clipboard-check text-blue-400"></i>Volume de Respostas por Questão</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="diarioQuestionCards"></div>
+        </div>
+        <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+          <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-bar text-blue-400"></i>SIM vs NÃO por Questão (Lançamento Diário)</h3>
+          <div style="height:500px"><canvas id="chartDiarioPerguntas"></canvas></div>
+        </div>
+      </div>
+
+      <!-- TAB 2: BET's -->
+      <div id="content-2" class="hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 grid-responsive-3">
+          <div class="bg-gradient-to-br from-purple-600 to-pink-600 rounded-2xl p-6 text-white">
+            <p class="text-sm opacity-80">Total de Fichas BET's</p>
+            <p class="text-4xl font-bold mt-2" id="totalFichasBets">0</p>
+          </div>
+          <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+            <p class="text-sm text-slate-400">Agentes Ativos</p>
+            <p class="text-4xl font-bold text-pink-400 mt-2" id="agentesBets">0</p>
+            <p class="text-xs text-slate-500 mt-2">com fichas registradas</p>
+          </div>
+          <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+            <p class="text-sm text-slate-400">Apostadores Identificados</p>
+            <p class="text-4xl font-bold text-amber-400 mt-2" id="totalApostadores">0</p>
+            <p class="text-xs text-slate-500 mt-2" id="pctApostadores">0% dos respondentes</p>
+          </div>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-dice text-purple-400"></i>Volume de Respostas por Questão</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="betsQuestionCards"></div>
+        </div>
+        <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+          <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-bar text-purple-400"></i>SIM vs NÃO por Questão (BET's)</h3>
+          <div style="height:500px"><canvas id="chartBetsPerguntas"></canvas></div>
+        </div>
+      </div>
+
+      <!-- TAB 3: Sala Interno -->
+      <div id="content-3" class="hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6 grid-responsive-3">
+          <div class="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-2xl p-6 text-white">
+            <p class="text-sm opacity-80">Total de Ações</p>
+            <p class="text-4xl font-bold mt-2" id="totalAcoesInterno">0</p>
+          </div>
+          <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+            <p class="text-sm text-slate-400">Agentes Ativos</p>
+            <p class="text-4xl font-bold text-teal-400 mt-2" id="agentesInternoCount">0</p>
+            <p class="text-xs text-slate-500 mt-2">com ações registradas</p>
+          </div>
+          <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+            <p class="text-sm text-slate-400">Agente Destaque</p>
+            <p class="text-2xl font-bold text-amber-400 mt-2" id="agenteDestaque">-</p>
+            <p class="text-xs text-slate-500 mt-2" id="acoesDestaque">0 ações</p>
+          </div>
+        </div>
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-tasks text-teal-400"></i>Volume por Tipo de Ação</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="internoActionCards"></div>
+        </div>
+        <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800 mb-6">
+          <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-bar text-teal-400"></i>Volume por Tipo de Ação</h3>
+          <div style="height:350px"><canvas id="chartInternoAcoes"></canvas></div>
+        </div>
+        <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800">
+          <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-building text-emerald-400"></i>Ações por Agente</h3>
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4" id="salaInternoCards"></div>
+        </div>
+      </div>
+
+      <!-- TAB 4: Produtividade por Agente -->
+      <div id="content-4" class="hidden">
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-users text-blue-400"></i>Produtividade por Agente</h3>
+          <p class="text-sm text-slate-400 mb-4">Volume real de fichas (Lançamento Diário / BET's) e ações (Sala Interno)</p>
+        </div>
+        <div class="bg-slate-900 rounded-2xl p-6 border border-slate-800 mb-6">
+          <h3 class="font-semibold mb-4 flex items-center gap-2"><i class="fas fa-chart-bar text-blue-400"></i>Fichas/Ações por Agente (segmentado por eixo)</h3>
+          <div style="height:400px"><canvas id="chartAgentesEixos"></canvas></div>
+        </div>
+        <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-slate-800">
+                <tr><th class="px-6 py-4 text-left text-sm font-semibold">Agente</th><th class="px-4 py-4 text-center text-sm font-semibold text-blue-400">Lanç. Diário</th><th class="px-4 py-4 text-center text-sm font-semibold text-pink-400">BET's</th><th class="px-4 py-4 text-center text-sm font-semibold text-teal-400">Sala Interno</th><th class="px-6 py-4 text-center text-sm font-semibold bg-slate-700">TOTAL</th> </tr>
+              </thead>
+              <tbody id="tabelaProdutividade"></tbody>
+             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: Análise por Eixo -->
+      <div id="content-5" class="hidden">
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-4 flex items-center gap-2"><i class="fas fa-layer-group text-blue-400"></i>Análise Detalhada por Eixo</h3>
+          <p class="text-sm text-slate-400 mb-4">Comparativo SIM vs NÃO para cada questão, separado por eixo</p>
+        </div>
+        <div id="analiseEixosContainer"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para pré-visualização do PDF -->
+<div id="pdfModal" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
+  <div class="bg-white w-full max-w-[1100px] max-h-[95vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl">
+    <div class="px-6 py-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-700 to-indigo-700 text-white">
+      <div class="flex items-center gap-3"><i class="fas fa-file-pdf text-2xl"></i><div><h3 class="text-lg font-bold">Pré-visualização do Relatório</h3><p class="text-xs text-blue-200">Sala do Consumidor - PROCON Rio - A4 Horizontal</p></div></div>
+      <div class="flex gap-3">
+        <button onclick="closePDFModal()" class="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm"><i class="fas fa-times mr-1"></i> Fechar</button>
+        <button id="downloadPdfBtn" class="px-5 py-2 bg-white text-blue-700 rounded-lg font-medium hover:bg-blue-50 transition-colors flex items-center gap-2"><i class="fas fa-download"></i> Baixar PDF</button>
+      </div>
+    </div>
+    <div class="flex-1 overflow-auto bg-gray-100 p-6" id="pdfPreviewContainer">
+      <div class="text-center text-gray-500">Gerando pré-visualização...</div>
+    </div>
+  </div>
+</div>
+
+<div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/50 z-40 lg:hidden" onclick="toggleSidebar()"></div>
+
+<script>
+// ============================================
+// CONFIGURAÇÃO DE EIXOS (idêntico ao original)
+// ============================================
+const eixos = [
+  { id: "diario", nome: "Lançamento Diário", icone: "fa-calendar-alt", cor: "#3b82f6" },
+  { id: "bets", nome: "BET's (apostas)", icone: "fa-dice", cor: "#ec4899" },
+  { id: "interno", nome: "Sala Interno", icone: "fa-building", cor: "#14b8a6" }
+];
+
+let todasRespostas = [];
+let produtividadeData = [];
+let currentFilters = { sala: '', eixo: '', dataInicio: null, dataFim: null };
+let charts = {};
+let activeTab = 0;
+
+// ============================================
+// UTILIDADES (datas normalizadas para filtros PT-BR/Excel)
+// ============================================
+function excelSerialToDate(serial) {
+  if (typeof serial !== 'number' || !isFinite(serial)) return null;
+  const utcDays = Math.floor(serial - 25569);
+  const fractionalDay = serial - Math.floor(serial);
+  const utcValue = utcDays * 86400 + Math.round(fractionalDay * 86400);
+  const dateInfo = new Date(utcValue * 1000);
+  if (isNaN(dateInfo)) return null;
+  return new Date(dateInfo.getUTCFullYear(), dateInfo.getUTCMonth(), dateInfo.getUTCDate(), 0, 0, 0, 0);
+}
+
+function parseData(dataValue) {
+  if (dataValue === null || dataValue === undefined || dataValue === '') return null;
+
+  if (dataValue instanceof Date) {
+    const normalizedDate = new Date(dataValue.getFullYear(), dataValue.getMonth(), dataValue.getDate(), 0, 0, 0, 0);
+    return isNaN(normalizedDate) ? null : normalizedDate;
+  }
+
+  if (typeof dataValue === 'number') {
+    const excelDate = excelSerialToDate(dataValue);
+    if (excelDate) return excelDate;
+
+    const jsDate = new Date(dataValue);
+    if (!isNaN(jsDate)) {
+      jsDate.setHours(0, 0, 0, 0);
+      return jsDate;
+    }
+    return null;
+  }
+
+  const raw = String(dataValue).trim();
+  if (!raw) return null;
+
+  const numericRaw = Number(raw.replace(',', '.'));
+  if (!Number.isNaN(numericRaw) && /^\d+(?:[.,]\d+)?$/.test(raw)) {
+    const excelDate = excelSerialToDate(numericRaw);
+    if (excelDate) return excelDate;
+  }
+
+  let match = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
+  if (match) {
+    return new Date(parseInt(match[3], 10), parseInt(match[2], 10) - 1, parseInt(match[1], 10), 0, 0, 0, 0);
+  }
+
+  match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s]\d{1,2}:\d{2}(?::\d{2})?)?$/);
+  if (match) {
+    return new Date(parseInt(match[1], 10), parseInt(match[2], 10) - 1, parseInt(match[3], 10), 0, 0, 0, 0);
+  }
+
+  match = raw.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
+  if (match) {
+    return new Date(parseInt(match[3], 10), parseInt(match[2], 10) - 1, parseInt(match[1], 10), 0, 0, 0, 0);
+  }
+
+  const normalizedRaw = raw.includes('/') ? raw.replace(/(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1') : raw;
+  const parsedDate = new Date(normalizedRaw);
+  if (!isNaN(parsedDate)) {
+    parsedDate.setHours(0, 0, 0, 0);
+    return parsedDate;
+  }
+
+  return null;
+}
+
+function toYMD(date) {
+  if (!date) return null;
+  return date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+}
+
+function formatDateBR(date) {
+  if (!date) return 'Todos os períodos';
+  return date.toLocaleDateString('pt-BR');
+}
+
+function colIndex(letra) {
+  let acc = 0;
+  for (let i = 0; i < letra.length; i++) acc = acc * 26 + (letra.charCodeAt(i) - 64);
+  return acc - 1;
+}
+
+// ============================================
+// DEFINIÇÃO DAS PERGUNTAS
+// ============================================
+const perguntasDiario = [
+  { nome: "Conhece seus direitos?", colSim: "J", colNao: "K", categoria: "Geral" },
+  { nome: "Conhece o CDC?", colSim: "L", colNao: "M", categoria: "Geral" },
+  { nome: "Conhece a Secretaria Municipal?", colSim: "N", colNao: "O", categoria: "Geral" },
+  { nome: "Conhece o Procon Carioca?", colSim: "P", colNao: "Q", categoria: "Geral" },
+  { nome: "Sabe como pedir ajuda ao Procon?", colSim: "R", colNao: "S", categoria: "Geral" },
+  { nome: "Utiliza internet?", colSim: "T", colNao: "U", categoria: "Internet e Compras Online" },
+  { nome: "Faz compras pela internet?", colSim: "V", colNao: "W", categoria: "Internet e Compras Online" },
+  { nome: "Já teve problema com compras online?", colSim: "X", colNao: "Y", categoria: "Internet e Compras Online" },
+  { nome: "Possui conta bancária?", colSim: "Z", colNao: "AA", categoria: "Educação Financeira" },
+  { nome: "Já teve problema com o banco?", colSim: "AB", colNao: "AC", categoria: "Educação Financeira" },
+  { nome: "Possui empréstimo consignado?", colSim: "AD", colNao: "AE", categoria: "Educação Financeira" },
+  { nome: "Salário cobre despesas?", colSim: "AF", colNao: "AG", categoria: "Educação Financeira" },
+  { nome: "Fica dívida para o mês seguinte?", colSim: "AH", colNao: "AI", categoria: "Educação Financeira" },
+  { nome: "Possui outras dívidas?", colSim: "AJ", colNao: "AK", categoria: "Educação Financeira" },
+  { nome: "Possui nome no SCPC/Serasa?", colSim: "AL", colNao: "AM", categoria: "Educação Financeira" },
+  { nome: "Interesse em renegociar dívidas?", colSim: "AN", colNao: "AO", categoria: "Educação Financeira" },
+  { nome: "Já teve problema com telefonia?", colSim: "AP", colNao: "AQ", categoria: "Telefonia e Internet" },
+  { nome: "Já teve problema com internet?", colSim: "AR", colNao: "AS", categoria: "Telefonia e Internet" },
+  { nome: "Possui água e luz?", colSim: "AT", colNao: "AU", categoria: "Serviços Essenciais" },
+  { nome: "Problema com água?", colSim: "AV", colNao: "AW", categoria: "Serviços Essenciais" },
+  { nome: "Problema com luz?", colSim: "AX", colNao: "AY", categoria: "Serviços Essenciais" },
+  { nome: "Possui gás encanado?", colSim: "AZ", colNao: "BA", categoria: "Gás" },
+  { nome: "Possui gás botijão?", colSim: "BB", colNao: "BC", categoria: "Gás" },
+  { nome: "Problema com gás?", colSim: "BD", colNao: "BE", categoria: "Gás" }
+];
+
+const perguntasBets = [
+  { nome: "Conhece atividades de jogos on-line?", colSim: "F", colNao: "G", invert: false },
+  { nome: "Já realizou apostas on-line?", colSim: "H", colNao: "I", invert: true },
+  { nome: "Alguém da família apostou?", colSim: "J", colNao: "K", invert: false },
+  { nome: "Aposta 1 vez/dia", colSim: "L", colNao: "M", invert: false },
+  { nome: "Aposta várias/dia", colSim: "N", colNao: "O", invert: false },
+  { nome: "Aposta 1 vez/semana", colSim: "P", colNao: "Q", invert: false },
+  { nome: "Aposta várias/semana", colSim: "R", colNao: "S", invert: false },
+  { nome: "Aposta até R$100/mês", colSim: "T", colNao: "U", invert: false },
+  { nome: "Aposta R$100-500/mês", colSim: "V", colNao: "W", invert: false },
+  { nome: "Aposta R$500-1000/mês", colSim: "X", colNao: "Y", invert: false },
+  { nome: "Aposta >R$1000/mês", colSim: "Z", colNao: "AA", invert: false },
+  { nome: "Afetou saúde mental", colSim: "AB", colNao: "AC", invert: false },
+  { nome: "Afetou relação no trabalho", colSim: "AD", colNao: "AE", invert: false },
+  { nome: "Afetou família", colSim: "AF", colNao: "AG", invert: false },
+  { nome: "Afetou saúde física", colSim: "AH", colNao: "AI", invert: false },
+  { nome: "Apostou para recuperar perdas", colSim: "AJ", colNao: "AK", invert: false },
+  { nome: "Deixou de cumprir obrigações", colSim: "AL", colNao: "AM", invert: false }
+];
+
+const acoesSalaInterno = ["Triagem", "Oitiva", "Elaboração reclamação", "Homologação", "Feedback", "Pedidos coordenação", "Resumos"];
+
+// ============================================
+// PARSING DAS ABAS (idêntico ao original)
+// ============================================
+function parseLancamentoDiario(rows) {
+  const answers = [], prod = [];
+  let startRow = 0;
+  for (let i = 0; i < Math.min(20, rows.length); i++) {
+    if (rows[i] && rows[i][0] && String(rows[i][0]).toUpperCase().includes("DATA")) { startRow = i + 1; break; }
+  }
+  if (rows[startRow] && rows[startRow][0] === null && String(rows[startRow][9] || '').toUpperCase() === 'SIM') startRow++;
+  for (let i = startRow; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length < 5) continue;
+    const data = parseData(r[0]);
+    if (!data) continue;
+    const dataStr = toYMD(data);
+    const sala = r[1] || '', unidade = r[2] || '', agente = r[3] || '';
+    const fichas = parseInt(r[4]) || 0;
+    if (fichas > 0 && agente) prod.push({ dataStr, sala, unidade, agente, eixo: "diario", fichas });
+    for (let q of perguntasDiario) {
+      const simQtd = parseInt(r[colIndex(q.colSim)]) || 0;
+      const naoQtd = parseInt(r[colIndex(q.colNao)]) || 0;
+      for (let k = 0; k < simQtd; k++) answers.push({ dataStr, sala, unidade, agente, eixo: "diario", pergunta: q.nome, resposta: "SIM", categoria: q.categoria });
+      for (let k = 0; k < naoQtd; k++) answers.push({ dataStr, sala, unidade, agente, eixo: "diario", pergunta: q.nome, resposta: "NAO", categoria: q.categoria });
+    }
+  }
+  return { answers, prod };
+}
+
+function parseBets(rows) {
+  const answers = [], prod = [];
+  let startRow = 0;
+  for (let i = 0; i < Math.min(20, rows.length); i++) {
+    if (rows[i] && rows[i][0] && String(rows[i][0]).toUpperCase().includes("DATA")) { startRow = i + 1; break; }
+  }
+  if (rows[startRow] && rows[startRow][0] === null && String(rows[startRow][5] || '').toUpperCase() === 'SIM') startRow++;
+  for (let i = startRow; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length < 5) continue;
+    const data = parseData(r[0]);
+    if (!data) continue;
+    const dataStr = toYMD(data);
+    const sala = r[1] || '', unidade = r[2] || '', agente = r[3] || '';
+    const fichas = parseInt(r[4]) || 0;
+    if (fichas > 0 && agente) prod.push({ dataStr, sala, unidade, agente, eixo: "bets", fichas });
+    for (let q of perguntasBets) {
+      let simQtd = parseInt(r[colIndex(q.colSim)]) || 0;
+      let naoQtd = parseInt(r[colIndex(q.colNao)]) || 0;
+      if (q.invert) [simQtd, naoQtd] = [naoQtd, simQtd];
+      for (let k = 0; k < simQtd; k++) answers.push({ dataStr, sala, unidade, agente, eixo: "bets", pergunta: q.nome, resposta: "SIM" });
+      for (let k = 0; k < naoQtd; k++) answers.push({ dataStr, sala, unidade, agente, eixo: "bets", pergunta: q.nome, resposta: "NAO" });
+    }
+  }
+  return { answers, prod };
+}
+
+function parseSalaInterno(rows) {
+  const answers = [], prod = [];
+  let startRow = 0;
+  for (let i = 0; i < Math.min(20, rows.length); i++) {
+    if (rows[i] && rows[i][0] && String(rows[i][0]).toUpperCase().includes("DATA")) { startRow = i + 1; break; }
+  }
+  if (rows[startRow] && rows[startRow][0] === null) startRow++;
+  const acoesCols = [5, 6, 7, 8, 9, 10, 11];
+  for (let i = startRow; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || r.length < 5) continue;
+    const data = parseData(r[0]);
+    if (!data) continue;
+    const dataStr = toYMD(data);
+    const sala = r[1] || '', unidade = r[2] || '', agente = r[3] || '';
+    let totalAcoes = 0;
+    for (let idx of acoesCols) totalAcoes += (parseInt(r[idx]) || 0);
+    if (totalAcoes > 0 && agente) prod.push({ dataStr, sala, unidade, agente, eixo: "interno", fichas: totalAcoes });
+    for (let idx = 0; idx < acoesSalaInterno.length; idx++) {
+      const qtd = parseInt(r[5 + idx]) || 0;
+      for (let k = 0; k < qtd; k++) answers.push({ dataStr, sala, unidade, agente, eixo: "interno", pergunta: acoesSalaInterno[idx], resposta: "SIM" });
+    }
+  }
+  return { answers, prod };
+}
+
+function processarUpload(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true, raw: true });
+    let todasAnswers = [], todaProd = [];
+    for (let name of wb.SheetNames) {
+      const sheet = wb.Sheets[name];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      if (name.includes("Lançamento Diário") || name.includes("LANCAMENTO") || name.includes("Lancamento")) {
+        const { answers, prod } = parseLancamentoDiario(rows);
+        todasAnswers.push(...answers); todaProd.push(...prod);
+      }
+      if (name.includes("BET") || name.includes("Bet")) {
+        const { answers, prod } = parseBets(rows);
+        todasAnswers.push(...answers); todaProd.push(...prod);
+      }
+      if (name.includes("Sala-Interno") || name.includes("Interno")) {
+        const { answers, prod } = parseSalaInterno(rows);
+        todasAnswers.push(...answers); todaProd.push(...prod);
+      }
+    }
+    todasRespostas = todasAnswers;
+    produtividadeData = todaProd;
+    document.getElementById('uploadContainer').classList.add('hidden');
+    document.getElementById('uploadedInfo').classList.remove('hidden');
+    document.getElementById('fileNameDisplay').textContent = file.name;
+    popularFiltros();
+    aplicarFiltros();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function popularFiltros() {
+  const salas = [...new Set(produtividadeData.map(r => r.sala))].filter(Boolean).sort();
+  const sel = document.getElementById('filterSala');
+  sel.innerHTML = '<option value="">Todas as salas</option>';
+  salas.forEach(s => { let opt = document.createElement('option'); opt.value = s; opt.textContent = s; sel.appendChild(opt); });
+}
+
+function applyFilters() { aplicarFiltros(); }
+
+function clearFilters() {
+  document.getElementById('filterDataInicio').value = '';
+  document.getElementById('filterDataFim').value = '';
+  document.getElementById('filterSala').value = '';
+  document.getElementById('filterEixo').value = '';
+  aplicarFiltros();
+}
+
+function getDataRange() {
+  const inicio = document.getElementById('filterDataInicio').value;
+  const fim = document.getElementById('filterDataFim').value;
+  return {
+    inicio: inicio ? new Date(inicio + 'T00:00:00') : null,
+    fim: fim ? new Date(fim + 'T23:59:59') : null
+  };
+}
+
+function aplicarFiltros() {
+  currentFilters.sala = document.getElementById('filterSala').value;
+  currentFilters.eixo = document.getElementById('filterEixo').value;
+  const { inicio, fim } = getDataRange();
+  currentFilters.dataInicio = inicio;
+  currentFilters.dataFim = fim;
+
+  let filtradas = [...todasRespostas];
+  let prodFiltradas = [...produtividadeData];
+
+  if (currentFilters.sala) {
+    filtradas = filtradas.filter(r => r.sala === currentFilters.sala);
+    prodFiltradas = prodFiltradas.filter(r => r.sala === currentFilters.sala);
+  }
+
+  if (inicio) {
+    const inicioStr = toYMD(inicio);
+    filtradas = filtradas.filter(r => r.dataStr >= inicioStr);
+    prodFiltradas = prodFiltradas.filter(r => r.dataStr >= inicioStr);
+  }
+  if (fim) {
+    const fimStr = toYMD(fim);
+    filtradas = filtradas.filter(r => r.dataStr <= fimStr);
+    prodFiltradas = prodFiltradas.filter(r => r.dataStr <= fimStr);
+  }
+
+  if (currentFilters.eixo && currentFilters.eixo !== '') {
+    filtradas = filtradas.filter(r => r.eixo === currentFilters.eixo);
+    prodFiltradas = prodFiltradas.filter(r => r.eixo === currentFilters.eixo);
+  }
+
+  renderizarTudo(filtradas, prodFiltradas);
+}
+
+// ============================================
+// CÁLCULO DE MÉTRICAS
+// ============================================
+function calcularMetricas(respFiltradas) {
+  const total = respFiltradas.length;
+  const totalSim = respFiltradas.filter(r => r.resposta === "SIM").length;
+  const totalNao = total - totalSim;
+  const eixoMap = {};
+  eixos.forEach(e => eixoMap[e.id] = { sim: 0, nao: 0, total: 0, perguntas: {} });
+  for (let r of respFiltradas) {
+    const e = eixoMap[r.eixo];
+    if (!e) continue;
+    e.total++;
+    if (r.resposta === "SIM") e.sim++; else e.nao++;
+    if (!e.perguntas[r.pergunta]) e.perguntas[r.pergunta] = { sim: 0, nao: 0, total: 0 };
+    e.perguntas[r.pergunta].total++;
+    if (r.resposta === "SIM") e.perguntas[r.pergunta].sim++; else e.perguntas[r.pergunta].nao++;
+  }
+  for (let e of Object.values(eixoMap)) {
+    e.pctSim = e.total ? Math.round((e.sim / e.total) * 100) : 0;
+    for (let p of Object.values(e.perguntas)) p.pctSim = p.total ? Math.round((p.sim / p.total) * 100) : 0;
+  }
+  return { total, totalSim, totalNao, eixoMap };
+}
+
+function contarAgentesEixo(prodFiltradas, eixoId) {
+  return new Set(prodFiltradas.filter(p => p.eixo === eixoId && p.fichas > 0).map(p => p.agente)).size;
+}
+
+// ============================================
+// FUNÇÕES DE RENDERIZAÇÃO (com contraste melhorado)
+// ============================================
+function gerarQuestionCards(containerId, perguntas, corSim, corNao) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = perguntas.map(([nome, data]) => {
+    const pctSim = data.total ? Math.round((data.sim / data.total) * 100) : 0;
+    const pctNao = 100 - pctSim;
+    return `<div class="question-card">
+      <p class="text-sm font-medium mb-3 text-slate-200">${nome}</p>
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-bold sim-count" style="color:${corSim}">${data.sim}</span>
+          <span class="text-xs text-slate-400">SIM</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400">NÃO</span>
+          <span class="text-2xl font-bold nao-count" style="color:${corNao}">${data.nao}</span>
+        </div>
+      </div>
+      <div class="flex gap-1 h-2 rounded-full overflow-hidden bg-slate-700">
+        <div class="rounded-l-full" style="width:${pctSim}%; background:${corSim}"></div>
+        <div class="rounded-r-full" style="width:${pctNao}%; background:${corNao}"></div>
+      </div>
+      <div class="flex justify-between text-xs mt-1">
+        <span style="color:${corSim}">${pctSim}%</span>
+        <span class="text-slate-400">${data.total} total</span>
+        <span style="color:${corNao}">${pctNao}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function gerarActionCards(containerId, acoes) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const cores = ['#14b8a6', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'];
+  const totalGeral = acoes.reduce((s, [, v]) => s + v, 0);
+  container.innerHTML = acoes.map(([nome, qtd], i) => {
+    const pct = totalGeral ? Math.round((qtd / totalGeral) * 100) : 0;
+    return `<div class="question-card">
+      <p class="text-sm font-medium mb-3 text-slate-200">${nome}</p>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-3xl font-bold" style="color:${cores[i % cores.length]}">${qtd}</span>
+        <span class="text-xs text-slate-400">ações</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%; background:${cores[i % cores.length]}"></div></div>
+      <p class="text-xs text-slate-500 mt-1">${pct}% do total</p>
+    </div>`;
+  }).join('');
+}
+
+function renderizarTudo(respFiltradas, prodFiltradas) {
+  const { total, totalSim, totalNao, eixoMap } = calcularMetricas(respFiltradas);
+  // Armazena para uso no gerador de PDF
+  window.__lastEixoMap = eixoMap;
+  window.__lastRespFiltradas = respFiltradas;
+  window.__lastProdFiltradas = prodFiltradas;
+
+  document.getElementById('totalSim').innerText = totalSim;
+  document.getElementById('totalNao').innerText = totalNao;
+  document.getElementById('totalAtendimentos').innerText = total;
+  document.getElementById('pctSim').innerText = total ? `${Math.round(totalSim / total * 100)}% do total` : '0%';
+  document.getElementById('pctNao').innerText = total ? `${Math.round(totalNao / total * 100)}% do total` : '0%';
+  document.getElementById('simDiario').innerText = eixoMap.diario?.sim || 0;
+  document.getElementById('simBets').innerText = eixoMap.bets?.sim || 0;
+  document.getElementById('simInterno').innerText = eixoMap.interno?.sim || 0;
+  document.getElementById('naoDiario').innerText = eixoMap.diario?.nao || 0;
+  document.getElementById('naoBets').innerText = eixoMap.bets?.nao || 0;
+  document.getElementById('naoInterno').innerText = eixoMap.interno?.nao || 0;
+
+  const agentesDiarioCount = contarAgentesEixo(prodFiltradas, 'diario');
+  const agentesBetsCount = contarAgentesEixo(prodFiltradas, 'bets');
+  const agentesInternoCount = contarAgentesEixo(prodFiltradas, 'interno');
+  const totalAgentes = new Set(prodFiltradas.filter(p => p.fichas > 0).map(p => p.agente)).size;
+  const salasUnicas = new Set(prodFiltradas.map(r => r.sala)).size;
+
+  document.getElementById('metricsCards').innerHTML = `
+    <div class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-5 text-white card-hover"><p class="text-sm opacity-80">Respostas SIM</p><p class="text-4xl font-bold">${totalSim}</p><div class="mt-2 text-xs">${total ? Math.round(totalSim / total * 100) : 0}% do total</div></div>
+    <div class="bg-gradient-to-br from-rose-600 to-pink-700 rounded-2xl p-5 text-white card-hover"><p class="text-sm opacity-80">Respostas NÃO</p><p class="text-4xl font-bold">${totalNao}</p><div class="mt-2 text-xs">${total ? Math.round(totalNao / total * 100) : 0}% do total</div></div>
+    <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 card-hover"><p class="text-sm text-slate-400">Agentes Ativos</p><p class="text-4xl font-bold text-blue-400">${totalAgentes}</p><div class="mt-2 text-xs text-slate-500">📋 ${agentesDiarioCount} | 🎲 ${agentesBetsCount} | 🏢 ${agentesInternoCount}</div></div>
+    <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800 card-hover"><p class="text-sm text-slate-400">Salas Ativas</p><p class="text-4xl font-bold text-amber-400">${salasUnicas}</p></div>`;
+
+  document.getElementById('eixosCards').innerHTML = eixos.map(e => {
+    const m = eixoMap[e.id] || { sim: 0, nao: 0, total: 0, pctSim: 0 };
+    const agEixo = contarAgentesEixo(prodFiltradas, e.id);
+    return `<div class="eixo-card rounded-2xl p-4 card-hover cursor-pointer" onclick="filtrarPorEixo('${e.id}')">
+      <div class="flex items-center gap-3 mb-3"><div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:${e.cor}20; color:${e.cor}"><i class="fas ${e.icone}"></i></div><div class="flex-1"><p class="text-sm font-medium">${e.nome}</p><p class="text-xl font-bold" style="color:${e.cor}">${m.pctSim}% <span class="text-xs">SIM</span></p></div></div>
+      <div class="space-y-2"><div class="flex justify-between text-xs"><span class="text-emerald-400">${m.sim} SIM</span><span class="text-rose-400">${m.nao} NÃO</span></div><div class="progress-bar"><div class="progress-fill sim" style="width:${m.pctSim}%"></div></div><p class="text-xs text-slate-400 text-center">${m.total} respostas • ${agEixo} agentes</p></div>
+    </div>`;
+  }).join('');
+
+  const topAgente = [...prodFiltradas.reduce((acc, r) => acc.set(r.agente, (acc.get(r.agente) || 0) + r.fichas), new Map())].sort((a, b) => b[1] - a[1])[0];
+  const topSala = [...prodFiltradas.reduce((acc, r) => acc.set(r.sala, (acc.get(r.sala) || 0) + r.fichas), new Map())].sort((a, b) => b[1] - a[1])[0];
+  const topEixo = eixos.map(e => ({ nome: e.nome, pct: eixoMap[e.id]?.pctSim || 0 })).sort((a, b) => b.pct - a.pct)[0];
+  document.getElementById('insightsCards').innerHTML = `
+    <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center"><i class="fas fa-trophy text-emerald-400"></i></div><div><p class="text-xs text-slate-400">Agente Destaque</p><p class="font-semibold text-emerald-400">${topAgente?.[0] || '-'}</p></div></div><p class="text-sm mt-2">${topAgente?.[1] || 0} fichas/ações</p></div>
+    <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center"><i class="fas fa-building text-blue-400"></i></div><div><p class="text-xs text-slate-400">Sala Mais Ativa</p><p class="font-semibold text-blue-400">${topSala?.[0] || '-'}</p></div></div><p class="text-sm mt-2">${topSala?.[1] || 0} fichas/ações</p></div>
+    <div class="bg-slate-900 rounded-2xl p-5 border border-slate-800"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center"><i class="fas fa-graduation-cap text-amber-400"></i></div><div><p class="text-xs text-slate-400">Eixo Melhor Avaliado</p><p class="font-semibold text-amber-400">${topEixo?.nome || '-'}</p></div></div><p class="text-sm mt-2">${topEixo?.pct || 0}% SIM</p></div>`;
+
+  if (charts.chartGeral) charts.chartGeral.destroy();
+  charts.chartGeral = new Chart(document.getElementById('chartGeral'), {
+    type: 'bar',
+    data: { labels: eixos.map(e => e.nome), datasets: [{ label: 'SIM', data: eixos.map(e => eixoMap[e.id]?.sim || 0), backgroundColor: '#10b981' }, { label: 'NÃO', data: eixos.map(e => eixoMap[e.id]?.nao || 0), backgroundColor: '#ef4444' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { y: { beginAtZero: true, ticks: { color: '#94a3b8' } }, x: { ticks: { color: '#94a3b8' } } } }
+  });
+
+  // TAB 1
+  const diarioProd = prodFiltradas.filter(p => p.eixo === 'diario');
+  const totalFD = diarioProd.reduce((s, p) => s + p.fichas, 0);
+  document.getElementById('totalFichasDiario').innerText = totalFD;
+  document.getElementById('agentesDiario').innerText = contarAgentesEixo(prodFiltradas, 'diario');
+  const diasMap = new Map();
+  diarioProd.forEach(p => diasMap.set(p.dataStr, (diasMap.get(p.dataStr) || 0) + p.fichas));
+  document.getElementById('diasAtivos').innerText = diasMap.size;
+  document.getElementById('mediaDiariaLabel').innerText = diasMap.size ? `${Math.round(totalFD / diasMap.size)} fichas/dia em média` : '0 fichas/dia';
+
+  const pergDiario = Object.entries(eixoMap.diario?.perguntas || {}).sort((a, b) => b[1].total - a[1].total);
+  gerarQuestionCards('diarioQuestionCards', pergDiario, '#10b981', '#ef4444');
+
+  if (charts.chartDiarioPerguntas) charts.chartDiarioPerguntas.destroy();
+  const labelsDiario = pergDiario.map(([n]) => n.length > 30 ? n.slice(0, 28) + '...' : n);
+  charts.chartDiarioPerguntas = new Chart(document.getElementById('chartDiarioPerguntas'), {
+    type: 'bar',
+    data: { labels: labelsDiario, datasets: [{ label: 'SIM', data: pergDiario.map(([, d]) => d.sim), backgroundColor: '#10b981' }, { label: 'NÃO', data: pergDiario.map(([, d]) => d.nao), backgroundColor: '#ef4444' }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { stacked: false, beginAtZero: true, ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8', font: { size: 10 } } } } }
+  });
+
+  // TAB 2
+  const betsProd = prodFiltradas.filter(p => p.eixo === 'bets');
+  const totalFB = betsProd.reduce((s, p) => s + p.fichas, 0);
+  document.getElementById('totalFichasBets').innerText = totalFB;
+  document.getElementById('agentesBets').innerText = contarAgentesEixo(prodFiltradas, 'bets');
+  const betsResp = respFiltradas.filter(r => r.eixo === 'bets');
+  const apostadores = betsResp.filter(r => r.pergunta === "Já realizou apostas on-line?" && r.resposta === "SIM").length;
+  const totalRespBet = betsResp.filter(r => r.pergunta === "Já realizou apostas on-line?").length;
+  document.getElementById('totalApostadores').innerText = apostadores;
+  document.getElementById('pctApostadores').innerText = totalRespBet ? `${Math.round(apostadores / totalRespBet * 100)}% dos respondentes` : '0%';
+
+  const pergBets = Object.entries(eixoMap.bets?.perguntas || {}).sort((a, b) => b[1].total - a[1].total);
+  gerarQuestionCards('betsQuestionCards', pergBets, '#a855f7', '#ef4444');
+
+  if (charts.chartBetsPerguntas) charts.chartBetsPerguntas.destroy();
+  const labelsBets = pergBets.map(([n]) => n.length > 30 ? n.slice(0, 28) + '...' : n);
+  charts.chartBetsPerguntas = new Chart(document.getElementById('chartBetsPerguntas'), {
+    type: 'bar',
+    data: { labels: labelsBets, datasets: [{ label: 'SIM', data: pergBets.map(([, d]) => d.sim), backgroundColor: '#a855f7' }, { label: 'NÃO', data: pergBets.map(([, d]) => d.nao), backgroundColor: '#ef4444' }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { beginAtZero: true, ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8', font: { size: 10 } } } } }
+  });
+
+  // TAB 3
+  const interno = respFiltradas.filter(r => r.eixo === 'interno');
+  const internoProd = prodFiltradas.filter(p => p.eixo === 'interno');
+  const totalAcoes = interno.length;
+  const agInterno = contarAgentesEixo(prodFiltradas, 'interno');
+  document.getElementById('totalAcoesInterno').innerText = totalAcoes;
+  document.getElementById('agentesInternoCount').innerText = agInterno;
+
+  const mapaInterno = new Map();
+  interno.forEach(r => mapaInterno.set(r.agente, (mapaInterno.get(r.agente) || 0) + 1));
+  const topInterno = [...mapaInterno.entries()].sort((a, b) => b[1] - a[1])[0];
+  document.getElementById('agenteDestaque').innerText = topInterno?.[0] || '-';
+  document.getElementById('acoesDestaque').innerText = topInterno ? `${topInterno[1]} ações` : '0 ações';
+
+  const acoesPorTipo = acoesSalaInterno.map(a => [a, interno.filter(r => r.pergunta === a).length]);
+  gerarActionCards('internoActionCards', acoesPorTipo);
+
+  if (charts.chartInternoAcoes) charts.chartInternoAcoes.destroy();
+  const coresAcoes = ['#14b8a6', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'];
+  charts.chartInternoAcoes = new Chart(document.getElementById('chartInternoAcoes'), {
+    type: 'bar',
+    data: { labels: acoesPorTipo.map(([n]) => n), datasets: [{ label: 'Quantidade', data: acoesPorTipo.map(([, v]) => v), backgroundColor: coresAcoes }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: '#94a3b8' } }, x: { ticks: { color: '#94a3b8', font: { size: 10 } } } } }
+  });
+
+  document.getElementById('salaInternoCards').innerHTML = [...mapaInterno.entries()].sort((a, b) => b[1] - a[1]).map(([ag, ac]) =>
+    `<div class="bg-slate-800 rounded-2xl p-5 text-center"><p class="text-sm truncate">${ag}</p><p class="text-4xl font-bold text-teal-400">${ac}</p><p class="text-xs text-slate-500">ações</p></div>`
+  ).join('') || '<p class="text-sm text-slate-500 col-span-full text-center py-8">Nenhuma ação registrada</p>';
+
+  // TAB 4
+  const prodMap = new Map();
+  for (let p of prodFiltradas) {
+    if (!prodMap.has(p.agente)) prodMap.set(p.agente, { diario: 0, bets: 0, interno: 0, total: 0 });
+    const entry = prodMap.get(p.agente);
+    entry[p.eixo] += p.fichas;
+    entry.total += p.fichas;
+  }
+  const tbody = document.getElementById('tabelaProdutividade');
+  tbody.innerHTML = Array.from(prodMap.entries()).sort((a, b) => b[1].total - a[1].total).map(([ag, d], idx) =>
+    `<tr class="border-b border-slate-800"><td class="px-6 py-4"><div class="flex items-center gap-3"><span class="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-xs">${idx + 1}</span><span class="font-medium">${ag}</span></div></td>
+    <td class="px-4 py-4 text-center">${d.diario}</td><td class="px-4 py-4 text-center">${d.bets}</td><td class="px-4 py-4 text-center">${d.interno}</td>
+    <td class="px-6 py-4 text-center bg-slate-800/50 font-bold">${d.total}</td></tr>`
+  ).join('');
+
+  if (charts.chartAgentesEixos) charts.chartAgentesEixos.destroy();
+  const top10 = Array.from(prodMap.entries()).sort((a, b) => b[1].total - a[1].total).slice(0, 10);
+  charts.chartAgentesEixos = new Chart(document.getElementById('chartAgentesEixos'), {
+    type: 'bar',
+    data: { labels: top10.map(([ag]) => ag), datasets: [{ label: 'Lanç. Diário', data: top10.map(([, d]) => d.diario), backgroundColor: '#3b82f6' }, { label: "BET's", data: top10.map(([, d]) => d.bets), backgroundColor: '#ec4899' }, { label: 'Sala Interno', data: top10.map(([, d]) => d.interno), backgroundColor: '#14b8a6' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { stacked: true, ticks: { color: '#94a3b8' } }, y: { stacked: true, beginAtZero: true, ticks: { color: '#94a3b8' } } } }
+  });
+
+  // TAB 5
+  renderAnaliseEixo(eixoMap, prodFiltradas);
+}
+
+function renderAnaliseEixo(eixoMap, prodFiltradas) {
+  const container = document.getElementById('analiseEixosContainer');
+  container.innerHTML = eixos.map(e => {
+    const m = eixoMap[e.id];
+    if (!m || m.total === 0) return '';
+    const agCount = contarAgentesEixo(prodFiltradas, e.id);
+    const perguntasList = Object.entries(m.perguntas).sort((a, b) => b[1].total - a[1].total);
+    const canvasId = `chartAnalise_${e.id}`;
+    return `<div class="bg-slate-900 rounded-2xl p-6 border border-slate-800 mb-6">
+      <div class="flex items-center gap-4 mb-4">
+        <div class="w-14 h-14 rounded-2xl flex items-center justify-center" style="background:${e.cor}20; color:${e.cor}"><i class="fas ${e.icone} text-2xl"></i></div>
+        <div class="flex-1">
+          <h4 class="font-semibold text-lg">${e.nome}</h4>
+          <p class="text-sm text-slate-400">${m.total} respostas | ${m.pctSim}% SIM | ${agCount} agentes</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        ${perguntasList.map(([perg, p]) => {
+          const pctS = p.total ? Math.round(p.sim / p.total * 100) : 0;
+          const pctN = 100 - pctS;
+          return `<div class="question-card">
+            <p class="text-xs font-medium mb-2 text-slate-300">${perg}</p>
+            <div class="flex justify-between items-center mb-1">
+              <span class="text-lg font-bold text-emerald-400">${p.sim}</span>
+              <span class="text-xs text-slate-500">${p.total}</span>
+              <span class="text-lg font-bold text-rose-400">${p.nao}</span>
+            </div>
+            <div class="flex gap-0.5 h-1.5 rounded-full overflow-hidden bg-slate-700">
+              <div style="width:${pctS}%; background:#10b981" class="rounded-l-full"></div>
+              <div style="width:${pctN}%; background:#ef4444" class="rounded-r-full"></div>
+            </div>
+            <div class="flex justify-between text-xs mt-0.5"><span class="text-emerald-400">${pctS}%</span><span class="text-rose-400">${pctN}%</span></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="height:${Math.max(250, perguntasList.length * 30)}px"><canvas id="${canvasId}"></canvas></div>
+    </div>`;
+  }).join('');
+
+  eixos.forEach(e => {
+    const m = eixoMap[e.id];
+    if (!m || m.total === 0) return;
+    const canvasId = `chartAnalise_${e.id}`;
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    if (charts[canvasId]) charts[canvasId].destroy();
+    const pergs = Object.entries(m.perguntas).sort((a, b) => b[1].total - a[1].total);
+    charts[canvasId] = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: pergs.map(([n]) => n.length > 35 ? n.slice(0, 33) + '...' : n),
+        datasets: e.id === 'interno'
+          ? [{ label: 'Quantidade', data: pergs.map(([, d]) => d.sim), backgroundColor: e.cor }]
+          : [{ label: 'SIM', data: pergs.map(([, d]) => d.sim), backgroundColor: '#10b981' }, { label: 'NÃO', data: pergs.map(([, d]) => d.nao), backgroundColor: '#ef4444' }]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8' } } }, scales: { x: { beginAtZero: true, ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8', font: { size: 10 } } } } }
+    });
+  });
+}
+
+// ============================================
+// NAVEGAÇÃO E UTILITÁRIOS
+// ============================================
+function filtrarPorEixo(eixoId) {
+  document.getElementById('filterEixo').value = eixoId;
+  aplicarFiltros();
+}
+
+function switchTab(n) {
+  activeTab = n;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active'));
+  document.getElementById(`tab-${n}`).classList.add('tab-active');
+  document.querySelectorAll('#contentArea > div').forEach(d => d.classList.add('hidden'));
+  document.getElementById(`content-${n}`).classList.remove('hidden');
+  const titles = ['Dashboard Geral', 'Mapeamento', "BET's • Apostas", 'Sala Interno', 'Produtividade', 'Análise por Eixo'];
+  document.getElementById('pageTitle').textContent = titles[n];
+  if (window.innerWidth < 1024) toggleSidebar();
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebarOverlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('hidden');
+}
+
+function resetUpload() { location.reload(); }
+
+// ============================================
+// PDF POR ABA — LAYOUT INDEPENDENTE E DEDICADO
+// ============================================
+let capturedPdfPages = [];
+
+const PDF_CONFIG = {
+  pageWidthMm: 297,
+  pageHeightMm: 210,
+  marginMm: 12,
+  renderWidthPx: 1480,
+  shellPaddingPx: 0,
+  canvasScale: 2
+};
+
+// ---- Estilos exclusivos do PDF (independentes do dashboard) ----
+const PDF_CSS = `
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body, .pdf-root { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; color: #1e293b; background: #fff; }
+
+  .pdf-page { width: 100%; background: #fff; padding: 28px 32px; }
+
+  /* Cabeçalho */
+  .pdf-header {
+    background: linear-gradient(135deg, #0f2563 0%, #1e40af 60%, #1d4ed8 100%);
+    border-radius: 14px; padding: 20px 28px; margin-bottom: 22px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 4px 20px rgba(30,64,175,0.3);
+  }
+  .pdf-header-logo { display: flex; align-items: center; gap: 14px; }
+  .pdf-header-icon {
+    width: 50px; height: 50px; background: rgba(255,255,255,0.2);
+    border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #fff;
+  }
+  .pdf-header-title { font-size: 22px; font-weight: 800; color: #fff; line-height: 1.2; }
+  .pdf-header-subtitle { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 3px; }
+  .pdf-header-meta { text-align: right; font-size: 11px; color: rgba(255,255,255,0.7); line-height: 1.7; }
+  .pdf-header-meta strong { color: rgba(255,255,255,0.95); font-weight: 600; }
+
+  /* Seções */
+  .pdf-section { margin-bottom: 18px; }
+  .pdf-section-title {
+    font-size: 13px; font-weight: 700; color: #1e40af;
+    padding: 8px 14px 8px 12px; background: #eff6ff;
+    border-left: 4px solid #1e40af; border-radius: 0 8px 8px 0;
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+
+  /* Cards métricos */
+  .pdf-grid { display: grid; gap: 10px; }
+  .pdf-grid-2 { grid-template-columns: repeat(2, 1fr); }
+  .pdf-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .pdf-grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .pdf-grid-5 { grid-template-columns: repeat(5, 1fr); }
+  .pdf-grid-6 { grid-template-columns: repeat(6, 1fr); }
+
+  .pdf-kpi {
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px;
+    padding: 14px 16px; border-top: 4px solid var(--kpi-color, #3b82f6);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .pdf-kpi-label { font-size: 10.5px; color: #64748b; font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .pdf-kpi-value { font-size: 30px; font-weight: 800; color: var(--kpi-color, #1e40af); line-height: 1; }
+  .pdf-kpi-sub { font-size: 10px; color: #94a3b8; margin-top: 4px; }
+  .pdf-kpi-detail { font-size: 10px; color: #64748b; margin-top: 6px; line-height: 1.6; }
+  .pdf-kpi-detail span { font-weight: 600; }
+
+  /* Card de eixo */
+  .pdf-eixo-card {
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .pdf-eixo-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .pdf-eixo-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .pdf-eixo-name { font-size: 12px; font-weight: 700; color: #1e293b; }
+  .pdf-eixo-pct { font-size: 22px; font-weight: 800; }
+  .pdf-progress-track { height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; margin: 6px 0; }
+  .pdf-progress-fill { height: 100%; border-radius: 4px; }
+  .pdf-eixo-stats { display: flex; justify-content: space-between; font-size: 10px; color: #64748b; margin-top: 4px; }
+
+  /* Card de questão */
+  .pdf-q-card {
+    background: #fafafa; border: 1px solid #e8edf2; border-radius: 10px;
+    padding: 12px; position: relative; overflow: hidden;
+  }
+  .pdf-q-title { font-size: 10.5px; font-weight: 600; color: #334155; margin-bottom: 8px; line-height: 1.4; }
+  .pdf-q-values { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .pdf-q-sim { font-size: 18px; font-weight: 800; color: #059669; }
+  .pdf-q-nao { font-size: 18px; font-weight: 800; color: #dc2626; }
+  .pdf-q-total { font-size: 10px; color: #94a3b8; text-align: center; }
+  .pdf-q-bar { display: flex; height: 5px; border-radius: 3px; overflow: hidden; background: #f1f5f9; }
+  .pdf-q-bar-sim { background: #10b981; }
+  .pdf-q-bar-nao { background: #ef4444; }
+  .pdf-q-pcts { display: flex; justify-content: space-between; font-size: 9.5px; margin-top: 3px; }
+  .pdf-q-pct-sim { color: #059669; font-weight: 600; }
+  .pdf-q-pct-nao { color: #dc2626; font-weight: 600; }
+
+  /* Card de ação (Sala Interno) */
+  .pdf-action-card {
+    background: #fafafa; border: 1px solid #e8edf2; border-radius: 10px; padding: 12px; text-align: center;
+  }
+  .pdf-action-title { font-size: 10.5px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+  .pdf-action-value { font-size: 24px; font-weight: 800; }
+  .pdf-action-pct { font-size: 10px; color: #94a3b8; }
+
+  /* Insight cards */
+  .pdf-insight {
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 14px;
+    display: flex; align-items: flex-start; gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .pdf-insight-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; }
+  .pdf-insight-label { font-size: 10px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.03em; }
+  .pdf-insight-value { font-size: 13px; font-weight: 700; color: #1e293b; margin-top: 2px; }
+  .pdf-insight-sub { font-size: 10.5px; color: #64748b; margin-top: 2px; }
+
+  /* Gráfico wrapper */
+  .pdf-chart-wrap {
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center;
+  }
+  .pdf-chart-title { font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 12px; text-align: left; }
+  .pdf-chart-wrap img { display: block; width: 100%; height: auto; border-radius: 6px; }
+
+  /* Tabela de produtividade */
+  .pdf-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .pdf-table th { background: #1e40af; color: #fff; padding: 9px 12px; font-weight: 600; text-align: left; }
+  .pdf-table th:not(:first-child) { text-align: center; }
+  .pdf-table td { padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+  .pdf-table td:not(:first-child) { text-align: center; }
+  .pdf-table tr:nth-child(even) td { background: #f8fafc; }
+  .pdf-table tr:last-child td { border-bottom: none; }
+  .pdf-table .col-total { font-weight: 700; color: #1e40af; background: #eff6ff !important; }
+
+  /* Agente card (Sala Interno) */
+  .pdf-agent-card {
+    background: #fafafa; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; text-align: center;
+  }
+  .pdf-agent-name { font-size: 10.5px; font-weight: 600; color: #334155; margin-bottom: 4px; }
+  .pdf-agent-value { font-size: 22px; font-weight: 800; color: #0d9488; }
+  .pdf-agent-label { font-size: 9px; color: #94a3b8; }
+
+  /* Divisor de quebra de página — invisível, apenas para detecção */
+  .pdf-break-point { height: 1px; margin: 0; opacity: 0; }
+
+  /* Rodapé de página */
+  .pdf-footer {
+    margin-top: 20px; padding-top: 10px; border-top: 1px solid #e2e8f0;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 9.5px; color: #94a3b8;
+  }
+`;
+
+// ---- Captura de gráficos ativos como imagens ----
+function capturarGraficosAtivos() {
+  const imgs = {};
+  const canvasIds = [
+    'chartGeral', 'chartDiarioPerguntas', 'chartBetsPerguntas',
+    'chartInternoAcoes', 'chartAgentesEixos',
+    'chartAnalise_diario', 'chartAnalise_bets', 'chartAnalise_interno'
+  ];
+  canvasIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.tagName === 'CANVAS') {
+      try { imgs[id] = el.toDataURL('image/png', 1.0); } catch (e) { /* skip */ }
+    }
+  });
+  return imgs;
+}
+
+// ---- Utilitário de progresso ----
+function pdfProgress(sim, nao) {
+  const total = sim + nao;
+  const pctSim = total ? Math.round(sim / total * 100) : 0;
+  const pctNao = 100 - pctSim;
+  return `
+    <div class="pdf-progress-track">
+      <div class="pdf-progress-fill" style="width:${pctSim}%; background:#10b981; float:left;"></div>
+    </div>
+  `;
+}
+
+// ---- Construção de cards de questão para PDF ----
+function pdfQCards(perguntas, corSim = '#059669', corNao = '#dc2626') {
+  return perguntas.map(([nome, data]) => {
+    const pctSim = data.total ? Math.round(data.sim / data.total * 100) : 0;
+    const pctNao = 100 - pctSim;
+    return `<div class="pdf-q-card">
+      <div class="pdf-q-title">${nome}</div>
+      <div class="pdf-q-values">
+        <div style="text-align:center">
+          <div class="pdf-q-sim" style="color:${corSim}">${data.sim}</div>
+          <div style="font-size:9px;color:#94a3b8">SIM</div>
+        </div>
+        <div class="pdf-q-total">${data.total}<br><span style="font-size:9px">total</span></div>
+        <div style="text-align:center">
+          <div class="pdf-q-nao" style="color:${corNao}">${data.nao}</div>
+          <div style="font-size:9px;color:#94a3b8">NÃO</div>
+        </div>
+      </div>
+      <div class="pdf-q-bar">
+        <div class="pdf-q-bar-sim" style="width:${pctSim}%;background:${corSim}"></div>
+        <div class="pdf-q-bar-nao" style="width:${pctNao}%;background:${corNao}"></div>
+      </div>
+      <div class="pdf-q-pcts">
+        <span class="pdf-q-pct-sim" style="color:${corSim}">${pctSim}%</span>
+        <span class="pdf-q-pct-nao" style="color:${corNao}">${pctNao}%</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- Construção do documento PDF para cada aba ----
+function buildPdfDocument(tabIndex, imgs) {
+  // Lê os dados já renderizados no DOM
+  const g = (id) => (document.getElementById(id)?.innerText || document.getElementById(id)?.textContent || '–').trim();
+  const tabTitles = ['Dashboard Geral', 'Mapeamento — Lançamento Diário', "BET's • Apostas", 'Sala Interno', 'Produtividade por Agente', 'Análise por Eixo'];
+  const tabTitle = tabTitles[tabIndex] || 'Relatório';
+  const agora = new Date().toLocaleString('pt-BR');
+  const filtrosTexto = getFiltrosAplicadosTexto();
+
+  // --- Cabeçalho comum ---
+  const header = `
+    <div class="pdf-header">
+      <div class="pdf-header-logo">
+        <div class="pdf-header-icon"><i class="fas fa-shield-alt"></i></div>
+        <div>
+          <div class="pdf-header-title">Sala do Consumidor — PROCON Rio</div>
+          <div class="pdf-header-subtitle">Relatório: ${tabTitle}</div>
+        </div>
+      </div>
+      <div class="pdf-header-meta">
+        <div><strong>Filtros:</strong> ${filtrosTexto}</div>
+        <div><strong>Emissão:</strong> ${agora}</div>
+        <div style="margin-top:4px;font-size:10px;opacity:0.6;">v12.0 • Sala do Consumidor</div>
+      </div>
+    </div>`;
+
+  // --- Rodapé comum ---
+  const footer = `
+    <div class="pdf-footer">
+      <span>PROCON Rio — Sala do Consumidor</span>
+      <span>${tabTitle} • ${agora}</span>
+    </div>`;
+
+  // --- Corpo por aba ---
+  let body = '';
+  switch (tabIndex) {
+    case 0: body = buildPdfBody0(imgs, g); break;
+    case 1: body = buildPdfBody1(imgs, g); break;
+    case 2: body = buildPdfBody2(imgs, g); break;
+    case 3: body = buildPdfBody3(imgs, g); break;
+    case 4: body = buildPdfBody4(imgs, g); break;
+    case 5: body = buildPdfBody5(imgs, g); break;
+    default: body = '<p style="color:#64748b;text-align:center;padding:40px;">Aba sem dados para exportação.</p>';
+  }
+
+  // --- Monta o shell HTML ---
+  const shell = document.createElement('div');
+  shell.id = 'pdfRenderShell';
+  shell.style.cssText = `position:fixed;left:-20000px;top:0;z-index:-1;width:${PDF_CONFIG.renderWidthPx}px;background:#fff;overflow:visible;`;
+
+  const styleEl = document.createElement('style');
+  styleEl.textContent = PDF_CSS;
+
+  const root = document.createElement('div');
+  root.className = 'pdf-root pdf-page';
+  root.innerHTML = header + body + footer;
+
+  shell.appendChild(styleEl);
+  shell.appendChild(root);
+  document.body.appendChild(shell);
+
+  return { shell, reportCard: root };
+}
+
+// ---- TAB 0: Dashboard Geral ----
+function buildPdfBody0(imgs, g) {
+  // Eixos
+  const eixosHtml = eixos.map(e => {
+    const simEl = document.getElementById(`totalSim`);
+    // Lê dos cards de eixo já renderizados
+    const eixoCard = document.querySelector(`#eixosCards [onclick*="${e.id}"]`);
+    const simV = eixoCard?.querySelector('.metric-sim, [style*="color:${e.cor}"]')?.innerText || '–';
+    const pctEl = eixoCard?.querySelector('.text-xl')?.innerText || '–';
+    // Tenta ler do DOM
+    const simVal = g(`simDiario`);
+    // Usa acesso direto via DOM
+    const eixoCardEls = document.querySelectorAll('#eixosCards > div');
+    const idx = eixos.indexOf(e);
+    const card = eixoCardEls[idx];
+    const pct = card?.querySelector('.text-xl')?.innerText?.replace(/[^0-9]/g, '') || '0';
+    const simN = card?.querySelector('.text-emerald-400')?.innerText?.replace(/[^0-9]/g, '') || '0';
+    const naoN = card?.querySelector('.text-rose-400')?.innerText?.replace(/[^0-9]/g, '') || '0';
+    const total = (parseInt(simN) || 0) + (parseInt(naoN) || 0);
+    return `<div class="pdf-eixo-card">
+      <div class="pdf-eixo-header">
+        <div class="pdf-eixo-icon" style="background:${e.cor}20;color:${e.cor}"><i class="fas ${e.icone}"></i></div>
+        <div>
+          <div class="pdf-eixo-name">${e.nome}</div>
+          <div class="pdf-eixo-pct" style="color:${e.cor}">${pct}% <span style="font-size:12px;font-weight:500">SIM</span></div>
+        </div>
+      </div>
+      <div class="pdf-progress-track"><div class="pdf-progress-fill" style="width:${pct}%;background:${e.cor}"></div></div>
+      <div class="pdf-eixo-stats">
+        <span style="color:#059669;font-weight:600">${simN} SIM</span>
+        <span>${total} respostas</span>
+        <span style="color:#dc2626;font-weight:600">${naoN} NÃO</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Insights
+  const insightEls = document.querySelectorAll('#insightsCards > div');
+  const insightHtml = Array.from(insightEls).map((el, i) => {
+    const label = el.querySelector('.text-xs.text-slate-400')?.innerText || '';
+    const value = el.querySelector('.font-semibold')?.innerText || '';
+    const sub = el.querySelector('.text-sm.mt-2, p.text-sm')?.innerText || '';
+    const colors = ['#059669', '#3b82f6', '#d97706'];
+    const icons = ['fa-trophy', 'fa-building', 'fa-graduation-cap'];
+    return `<div class="pdf-insight">
+      <div class="pdf-insight-icon" style="background:${colors[i]}20;color:${colors[i]}"><i class="fas ${icons[i]}"></i></div>
+      <div>
+        <div class="pdf-insight-label">${label}</div>
+        <div class="pdf-insight-value" style="color:${colors[i]}">${value}</div>
+        <div class="pdf-insight-sub">${sub}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const chartHtml = imgs['chartGeral']
+    ? `<div class="pdf-chart-wrap">
+        <div class="pdf-chart-title"><i class="fas fa-chart-bar" style="color:#10b981;margin-right:8px"></i>Distribuição Geral — SIM vs NÃO por Eixo</div>
+        <img src="${imgs['chartGeral']}" alt="Gráfico Geral" />
+      </div>` : '';
+
+  return `
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-tachometer-alt"></i>Métricas Principais</div>
+      <div class="pdf-grid pdf-grid-4">
+        <div class="pdf-kpi" style="--kpi-color:#10b981">
+          <div class="pdf-kpi-label">Respostas SIM</div>
+          <div class="pdf-kpi-value">${g('totalSim')}</div>
+          <div class="pdf-kpi-sub">${g('pctSim')}</div>
+          <div class="pdf-kpi-detail">
+            📋 Diário: <span>${g('simDiario')}</span><br>
+            🎲 BET's: <span>${g('simBets')}</span><br>
+            🏢 Interno: <span>${g('simInterno')}</span>
+          </div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#dc2626">
+          <div class="pdf-kpi-label">Respostas NÃO</div>
+          <div class="pdf-kpi-value">${g('totalNao')}</div>
+          <div class="pdf-kpi-sub">${g('pctNao')}</div>
+          <div class="pdf-kpi-detail">
+            📋 Diário: <span>${g('naoDiario')}</span><br>
+            🎲 BET's: <span>${g('naoBets')}</span><br>
+            🏢 Interno: <span>${g('naoInterno')}</span>
+          </div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#f59e0b">
+          <div class="pdf-kpi-label">Total de Respostas</div>
+          <div class="pdf-kpi-value">${g('totalAtendimentos')}</div>
+          <div class="pdf-kpi-sub">fichas/respostas</div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#3b82f6">
+          <div class="pdf-kpi-label">Agentes Ativos</div>
+          <div class="pdf-kpi-value">${document.querySelector('#metricsCards .text-blue-400')?.innerText || '–'}</div>
+          <div class="pdf-kpi-sub">com registros</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-th-large"></i>Conhecimento por Eixo (% SIM)</div>
+      <div class="pdf-grid pdf-grid-3">${eixosHtml}</div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-lightbulb"></i>Insights e Destaques</div>
+      <div class="pdf-grid pdf-grid-3">${insightHtml}</div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">${chartHtml}</div>
+  `;
+}
+
+// ---- TAB 1: Lançamento Diário ----
+function buildPdfBody1(imgs, g) {
+  const pergsDiario = Object.entries(
+    (window.__lastEixoMap?.diario?.perguntas) || {}
+  ).sort((a, b) => b[1].total - a[1].total);
+
+  // Fallback: lê cards do DOM
+  const qCards = pergsDiario.length
+    ? pdfQCards(pergsDiario, '#059669', '#dc2626')
+    : lerQCardsDOM('diarioQuestionCards', '#059669', '#dc2626');
+
+  const chartHtml = imgs['chartDiarioPerguntas']
+    ? `<div class="pdf-chart-wrap">
+        <div class="pdf-chart-title"><i class="fas fa-chart-bar" style="color:#3b82f6;margin-right:8px"></i>SIM vs NÃO por Questão — Lançamento Diário</div>
+        <img src="${imgs['chartDiarioPerguntas']}" alt="Gráfico Lançamento Diário" />
+      </div>` : '';
+
+  return `
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-calendar-alt"></i>Resumo — Lançamento Diário</div>
+      <div class="pdf-grid pdf-grid-3">
+        <div class="pdf-kpi" style="--kpi-color:#3b82f6">
+          <div class="pdf-kpi-label">Total de Fichas</div>
+          <div class="pdf-kpi-value">${g('totalFichasDiario')}</div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#10b981">
+          <div class="pdf-kpi-label">Agentes Ativos</div>
+          <div class="pdf-kpi-value">${g('agentesDiario')}</div>
+          <div class="pdf-kpi-sub">com fichas registradas</div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#f59e0b">
+          <div class="pdf-kpi-label">Dias Ativos</div>
+          <div class="pdf-kpi-value">${g('diasAtivos')}</div>
+          <div class="pdf-kpi-sub">${g('mediaDiariaLabel')}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-clipboard-check"></i>Volume de Respostas por Questão</div>
+      <div class="pdf-grid pdf-grid-4">${qCards}</div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">${chartHtml}</div>
+  `;
+}
+
+// ---- TAB 2: BET's ----
+function buildPdfBody2(imgs, g) {
+  const pergsBets = Object.entries(
+    (window.__lastEixoMap?.bets?.perguntas) || {}
+  ).sort((a, b) => b[1].total - a[1].total);
+
+  const qCards = pergsBets.length
+    ? pdfQCards(pergsBets, '#a855f7', '#dc2626')
+    : lerQCardsDOM('betsQuestionCards', '#a855f7', '#dc2626');
+
+  const chartHtml = imgs['chartBetsPerguntas']
+    ? `<div class="pdf-chart-wrap">
+        <div class="pdf-chart-title"><i class="fas fa-chart-bar" style="color:#a855f7;margin-right:8px"></i>SIM vs NÃO por Questão — BET's</div>
+        <img src="${imgs['chartBetsPerguntas']}" alt="Gráfico BETs" />
+      </div>` : '';
+
+  return `
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-dice"></i>Resumo — BET's • Apostas</div>
+      <div class="pdf-grid pdf-grid-3">
+        <div class="pdf-kpi" style="--kpi-color:#a855f7">
+          <div class="pdf-kpi-label">Total de Fichas BET's</div>
+          <div class="pdf-kpi-value">${g('totalFichasBets')}</div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#ec4899">
+          <div class="pdf-kpi-label">Agentes Ativos</div>
+          <div class="pdf-kpi-value">${g('agentesBets')}</div>
+          <div class="pdf-kpi-sub">com fichas registradas</div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#f59e0b">
+          <div class="pdf-kpi-label">Apostadores Identificados</div>
+          <div class="pdf-kpi-value">${g('totalApostadores')}</div>
+          <div class="pdf-kpi-sub">${g('pctApostadores')}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-dice"></i>Volume de Respostas por Questão</div>
+      <div class="pdf-grid pdf-grid-4">${qCards}</div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">${chartHtml}</div>
+  `;
+}
+
+// ---- TAB 3: Sala Interno ----
+function buildPdfBody3(imgs, g) {
+  const coresAcoes = ['#14b8a6','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#ec4899','#06b6d4'];
+  const acaoEls = document.querySelectorAll('#internoActionCards > div');
+  const totalGeral = Array.from(acaoEls).reduce((s, el) => {
+    const v = parseInt(el.querySelector('.text-3xl, .text-2xl, [class*="font-bold"]')?.innerText || 0);
+    return s + (isNaN(v) ? 0 : v);
+  }, 0);
+
+  const acaoCardsHtml = Array.from(acaoEls).map((el, i) => {
+    const titulo = el.querySelector('p.text-sm, .text-sm')?.innerText || '–';
+    const valor = el.querySelector('.text-3xl, [class*="font-bold"]:not(.text-sm)')?.innerText || '0';
+    const pct = el.querySelector('p.text-xs, .text-xs.text-slate-5')?.innerText || '';
+    return `<div class="pdf-action-card">
+      <div class="pdf-action-title">${titulo}</div>
+      <div class="pdf-action-value" style="color:${coresAcoes[i % coresAcoes.length]}">${valor}</div>
+      <div class="pdf-action-pct">${pct}</div>
+    </div>`;
+  }).join('');
+
+  const agentEls = document.querySelectorAll('#salaInternoCards > div');
+  const agentCardsHtml = Array.from(agentEls).map(el => {
+    const nome = el.querySelector('p.text-sm, .text-sm:not(.text-slate)')?.innerText || '–';
+    const valor = el.querySelector('.text-4xl, .text-3xl')?.innerText || '0';
+    return `<div class="pdf-agent-card">
+      <div class="pdf-agent-name">${nome}</div>
+      <div class="pdf-agent-value">${valor}</div>
+      <div class="pdf-agent-label">ações</div>
+    </div>`;
+  }).join('');
+
+  const chartHtml = imgs['chartInternoAcoes']
+    ? `<div class="pdf-chart-wrap">
+        <div class="pdf-chart-title"><i class="fas fa-chart-bar" style="color:#14b8a6;margin-right:8px"></i>Volume por Tipo de Ação</div>
+        <img src="${imgs['chartInternoAcoes']}" alt="Gráfico Interno" />
+      </div>` : '';
+
+  return `
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-building"></i>Resumo — Sala Interno</div>
+      <div class="pdf-grid pdf-grid-3">
+        <div class="pdf-kpi" style="--kpi-color:#14b8a6">
+          <div class="pdf-kpi-label">Total de Ações</div>
+          <div class="pdf-kpi-value">${g('totalAcoesInterno')}</div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#3b82f6">
+          <div class="pdf-kpi-label">Agentes Ativos</div>
+          <div class="pdf-kpi-value">${g('agentesInternoCount')}</div>
+          <div class="pdf-kpi-sub">com ações registradas</div>
+        </div>
+        <div class="pdf-kpi" style="--kpi-color:#f59e0b">
+          <div class="pdf-kpi-label">Agente Destaque</div>
+          <div class="pdf-kpi-value" style="font-size:18px">${g('agenteDestaque')}</div>
+          <div class="pdf-kpi-sub">${g('acoesDestaque')}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-tasks"></i>Volume por Tipo de Ação</div>
+      <div class="pdf-grid pdf-grid-4">${acaoCardsHtml || '<p style="color:#94a3b8;font-size:12px">Nenhuma ação registrada</p>'}</div>
+    </div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">${chartHtml}</div>
+
+    ${agentCardsHtml ? `
+    <div class="pdf-break-point" data-pdf-break></div>
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-building"></i>Ações por Agente</div>
+      <div class="pdf-grid pdf-grid-5">${agentCardsHtml}</div>
+    </div>` : ''}
+  `;
+}
+
+// ---- TAB 4: Produtividade por Agente ----
+function buildPdfBody4(imgs, g) {
+  const rows = document.querySelectorAll('#tabelaProdutividade tr');
+  const tabelaHtml = Array.from(rows).map(tr => {
+    const tds = tr.querySelectorAll('td');
+    if (!tds.length) return '';
+    return `<tr>
+      <td>${tds[0]?.innerText || ''}</td>
+      <td style="color:#3b82f6;font-weight:600">${tds[1]?.innerText || '0'}</td>
+      <td style="color:#ec4899;font-weight:600">${tds[2]?.innerText || '0'}</td>
+      <td style="color:#14b8a6;font-weight:600">${tds[3]?.innerText || '0'}</td>
+      <td class="col-total">${tds[4]?.innerText || '0'}</td>
+    </tr>`;
+  }).join('');
+
+  const chartHtml = imgs['chartAgentesEixos']
+    ? `<div class="pdf-chart-wrap">
+        <div class="pdf-chart-title"><i class="fas fa-chart-bar" style="color:#3b82f6;margin-right:8px"></i>Fichas/Ações por Agente — segmentado por Eixo (Top 10)</div>
+        <img src="${imgs['chartAgentesEixos']}" alt="Gráfico Produtividade" />
+      </div>` : '';
+
+  return `
+    <div class="pdf-section">${chartHtml}</div>
+
+    <div class="pdf-break-point" data-pdf-break></div>
+
+    <div class="pdf-section">
+      <div class="pdf-section-title"><i class="fas fa-users"></i>Produtividade Detalhada por Agente</div>
+      <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <table class="pdf-table">
+          <thead><tr>
+            <th>Agente</th>
+            <th style="background:#2563eb">Lanç. Diário</th>
+            <th style="background:#db2777">BET's</th>
+            <th style="background:#0d9488">Sala Interno</th>
+            <th style="background:#1e3a8a">TOTAL</th>
+          </tr></thead>
+          <tbody>${tabelaHtml || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Nenhum dado disponível</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ---- TAB 5: Análise por Eixo ----
+function buildPdfBody5(imgs, g) {
+  const eixoMap = window.__lastEixoMap || {};
+  let html = '';
+
+  eixos.forEach(e => {
+    const m = eixoMap[e.id];
+    if (!m || m.total === 0) return;
+    const pergs = Object.entries(m.perguntas).sort((a, b) => b[1].total - a[1].total);
+    const chartKey = `chartAnalise_${e.id}`;
+    const isInterno = e.id === 'interno';
+
+    const qCards = isInterno
+      ? pergs.map(([nome, data]) => `<div class="pdf-action-card">
+          <div class="pdf-action-title">${nome}</div>
+          <div class="pdf-action-value" style="color:${e.cor}">${data.sim}</div>
+          <div class="pdf-action-pct">ocorrências</div>
+        </div>`).join('')
+      : pdfQCards(pergs, '#059669', '#dc2626');
+
+    const chartHtml = imgs[chartKey]
+      ? `<div class="pdf-chart-wrap" style="margin-top:14px">
+          <div class="pdf-chart-title" style="color:${e.cor}"><i class="fas ${e.icone}" style="margin-right:8px"></i>Distribuição por Questão — ${e.nome}</div>
+          <img src="${imgs[chartKey]}" alt="Gráfico ${e.nome}" />
+        </div>` : '';
+
+    html += `
+      <div class="pdf-break-point" data-pdf-break></div>
+      <div class="pdf-section">
+        <div class="pdf-section-title" style="border-left-color:${e.cor};color:${e.cor}">
+          <i class="fas ${e.icone}"></i>${e.nome}
+          <span style="margin-left:auto;font-size:11px;font-weight:500;color:#64748b">
+            ${m.total} respostas • ${m.pctSim}% SIM • ${m.sim} SIM / ${m.nao} NÃO
+          </span>
+        </div>
+        <div class="pdf-grid ${isInterno ? 'pdf-grid-4' : 'pdf-grid-4'}" style="margin-bottom:14px">${qCards}</div>
+        ${chartHtml}
+      </div>
+    `;
+  });
+
+  return html || '<p style="color:#94a3b8;text-align:center;padding:40px">Nenhum dado disponível para análise por eixo.</p>';
+}
+
+// ---- Fallback: lê cards do DOM quando não há dados em memória ----
+function lerQCardsDOM(containerId, corSim, corNao) {
+  const cards = document.querySelectorAll(`#${containerId} > div`);
+  return Array.from(cards).map(card => {
+    const titulo = card.querySelector('p.text-sm')?.innerText || '–';
+    const simVal = card.querySelector('.sim-count, [style*="color:${corSim}"]')?.innerText || '0';
+    const naoVal = card.querySelector('.nao-count, [style*="color:${corNao}"]')?.innerText || '0';
+    const total = (parseInt(simVal) || 0) + (parseInt(naoVal) || 0);
+    const pctS = total ? Math.round((parseInt(simVal)||0)/total*100) : 0;
+    return `<div class="pdf-q-card">
+      <div class="pdf-q-title">${titulo}</div>
+      <div class="pdf-q-values">
+        <div style="text-align:center"><div class="pdf-q-sim" style="color:${corSim}">${simVal}</div><div style="font-size:9px;color:#94a3b8">SIM</div></div>
+        <div class="pdf-q-total">${total}<br><span style="font-size:9px">total</span></div>
+        <div style="text-align:center"><div class="pdf-q-nao" style="color:${corNao}">${naoVal}</div><div style="font-size:9px;color:#94a3b8">NÃO</div></div>
+      </div>
+      <div class="pdf-q-bar"><div class="pdf-q-bar-sim" style="width:${pctS}%;background:${corSim}"></div><div class="pdf-q-bar-nao" style="width:${100-pctS}%;background:${corNao}"></div></div>
+      <div class="pdf-q-pcts"><span style="color:${corSim};font-weight:600">${pctS}%</span><span style="color:${corNao};font-weight:600">${100-pctS}%</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ---- Utilitários de suporte ----
+function getFiltrosAplicadosTexto() {
+  const filtros = [];
+  if (currentFilters.sala) filtros.push(`Sala: ${currentFilters.sala}`);
+  if (currentFilters.eixo) {
+    const eixoAtual = eixos.find(e => e.id === currentFilters.eixo);
+    filtros.push(`Eixo: ${eixoAtual?.nome || currentFilters.eixo}`);
+  }
+  if (currentFilters.dataInicio || currentFilters.dataFim) {
+    filtros.push(`Período: ${formatDateBR(currentFilters.dataInicio)} até ${formatDateBR(currentFilters.dataFim)}`);
+  }
+  return filtros.length ? filtros.join(' • ') : 'Sem filtros aplicados';
+}
+
+function sanitizeFileName(value) {
+  return String(value || 'relatorio')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'relatorio';
+}
+
+// ---- Detecção de candidatos de quebra — baseada nos marcadores explícitos do PDF ----
+function collectBreakCandidates(rootElement) {
+  const rootRect = rootElement.getBoundingClientRect();
+  const candidates = new Set([0]);
+
+  const add = (v) => {
+    const r = Math.round(v);
+    if (Number.isFinite(r) && r > 20) candidates.add(r);
+  };
+
+  // Marcadores explícitos data-pdf-break têm prioridade máxima
+  rootElement.querySelectorAll('[data-pdf-break]').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    add(rect.top - rootRect.top - 4);
+    add(rect.top - rootRect.top + 4);
+  });
+
+  // Seções de nível superior
+  rootElement.querySelectorAll('.pdf-section').forEach(sec => {
+    const rect = sec.getBoundingClientRect();
+    add(rect.top - rootRect.top - 8);
+    add(rect.bottom - rootRect.top + 8);
+  });
+
+  // Linhas de grids PDF
+  rootElement.querySelectorAll('.pdf-grid').forEach(grid => {
+    const rows = new Map();
+    Array.from(grid.children).forEach(child => {
+      const cr = child.getBoundingClientRect();
+      const top = Math.round(cr.top - rootRect.top);
+      if (!rows.has(top)) rows.set(top, cr.bottom - rootRect.top);
+      else rows.set(top, Math.max(rows.get(top), cr.bottom - rootRect.top));
+    });
+    rows.forEach((bottom, top) => { add(top - 8); add(bottom + 8); });
+  });
+
+  // Linhas de tabela
+  rootElement.querySelectorAll('.pdf-table tr').forEach(tr => {
+    const rect = tr.getBoundingClientRect();
+    add(rect.bottom - rootRect.top + 2);
+  });
+
+  add(rootElement.scrollHeight);
+  return Array.from(candidates).sort((a, b) => a - b);
+}
+
+// ---- Fatiamento do canvas em páginas A4 landscape ----
+function buildPdfPagesFromCanvas(sourceCanvas, breakCandidates) {
+  const printableWidthMm  = PDF_CONFIG.pageWidthMm  - PDF_CONFIG.marginMm * 2;
+  const printableHeightMm = PDF_CONFIG.pageHeightMm - PDF_CONFIG.marginMm * 2;
+  const idealPageHeightPx = Math.floor((printableHeightMm * sourceCanvas.width) / printableWidthMm);
+  const minChunkHeightPx  = Math.floor(idealPageHeightPx * 0.50);
+  const searchWindowPx    = Math.floor(idealPageHeightPx * 0.30);
+  const pages = [];
+  let startY = 0;
+
+  while (startY < sourceCanvas.height) {
+    const remaining = sourceCanvas.height - startY;
+    let endY;
+    if (remaining <= idealPageHeightPx * 1.05) {
+      endY = sourceCanvas.height;
+    } else {
+      const idealEnd = startY + idealPageHeightPx;
+      // Procura o ponto de quebra mais próximo da altura ideal
+      const candidate = [...breakCandidates]
+        .filter(y => y > startY + minChunkHeightPx && y <= idealEnd + searchWindowPx)
+        .sort((a, b) => Math.abs(a - idealEnd) - Math.abs(b - idealEnd))[0];
+      endY = candidate || idealEnd;
+    }
+    if (endY <= startY) endY = Math.min(startY + idealPageHeightPx, sourceCanvas.height);
+
+    const sliceH = endY - startY;
+    const pageCanvas = document.createElement('canvas');
+    pageCanvas.width  = sourceCanvas.width;
+    pageCanvas.height = sliceH;
+    const ctx = pageCanvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+    ctx.drawImage(sourceCanvas, 0, startY, sourceCanvas.width, sliceH, 0, 0, sourceCanvas.width, sliceH);
+
+    pages.push({
+      image: pageCanvas.toDataURL('image/png', 1.0),
+      widthMm: printableWidthMm,
+      heightMm: (sliceH * printableWidthMm) / sourceCanvas.width,
+      marginMm: PDF_CONFIG.marginMm,
+      index: pages.length + 1
+    });
+    startY = endY;
+  }
+  return pages;
+}
+
+// ---- Pré-visualização no modal ----
+function renderPdfPreview(pages) {
+  document.getElementById('pdfPreviewContainer').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:28px;align-items:center;padding:8px 0">
+      ${pages.map(p => `
+        <div style="width:min(100%,1060px)">
+          <div style="background:#f8fafc;padding:6px 8px 4px;border-radius:6px 6px 0 0;display:flex;justify-content:space-between;align-items:center;border:1px solid #e2e8f0;border-bottom:none">
+            <span style="font-size:11px;font-weight:600;color:#475569">Página ${p.index} de ${pages.length}</span>
+            <span style="font-size:10px;color:#94a3b8">A4 Horizontal • ${Math.round(p.heightMm)}×${Math.round(p.widthMm)} mm</span>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:0 0 10px 10px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08)">
+            <img src="${p.image}" alt="Página ${p.index}" style="display:block;width:100%;height:auto" />
+          </div>
+        </div>
+      `).join('')}
+      <p style="font-size:12px;color:#64748b;text-align:center;padding-bottom:8px">
+        ${pages.length} página${pages.length > 1 ? 's' : ''} • Layout independente otimizado para impressão • Clique em <strong>Baixar PDF</strong> para exportar
+      </p>
+    </div>`;
+}
+
+// ---- Exportação final para PDF ----
+function exportPdfFromPages(pages) {
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+  pages.forEach((page, i) => {
+    if (i > 0) pdf.addPage('a4', 'landscape');
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, PDF_CONFIG.pageWidthMm, PDF_CONFIG.pageHeightMm, 'F');
+    pdf.addImage(page.image, 'PNG', page.marginMm, page.marginMm, page.widthMm, page.heightMm, undefined, 'FAST');
+    // Número de página discreto
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(148, 163, 184);
+    pdf.text(`${i + 1} / ${pages.length}`, PDF_CONFIG.pageWidthMm - 8, PDF_CONFIG.pageHeightMm - 4, { align: 'right' });
+  });
+  const tabTitles = ['Dashboard_Geral','Mapeamento','BETs_Apostas','Sala_Interno','Produtividade','Analise_Eixo'];
+  const tabName = tabTitles[activeTab] || 'Relatorio';
+  pdf.save(`Procon_${tabName}_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+// ---- Orquestrador principal ----
+async function generateCurrentTabPDF() {
+  if (todasRespostas.length === 0) {
+    alert('Importe uma planilha antes de exportar o PDF.');
+    return;
+  }
+
+  const pdfBtn = document.getElementById('tabPdfBtn');
+  const originalBtnHtml = pdfBtn?.innerHTML;
+  if (pdfBtn) { pdfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando…'; pdfBtn.disabled = true; }
+
+  let renderShell = null;
+
+  try {
+    // 1. Garante que fontes e imagens estejam prontas
+    await document.fonts?.ready;
+    await new Promise(r => setTimeout(r, 120));
+
+    // 2. Captura gráficos dos canvases ativos
+    const imgs = capturarGraficosAtivos();
+
+    // 3. Constrói o documento PDF dedicado (layout branco, independente)
+    const { shell, reportCard } = buildPdfDocument(activeTab, imgs);
+    renderShell = shell;
+
+    // 4. Aguarda imagens carregarem dentro do shell
+    await Promise.all(
+      Array.from(shell.querySelectorAll('img')).map(img =>
+        img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
+      )
+    );
+    await new Promise(r => setTimeout(r, 200));
+
+    // 5. Coleta candidatos de quebra com base nos marcadores explícitos
+    const rootRect = reportCard.getBoundingClientRect();
+    const breakCandidatesDom = collectBreakCandidates(reportCard);
+
+    // 6. Renderiza com html2canvas
+    const canvas = await html2canvas(reportCard, {
+      scale: PDF_CONFIG.canvasScale,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      windowWidth: reportCard.scrollWidth,
+      windowHeight: reportCard.scrollHeight,
+      scrollX: 0, scrollY: 0
+    });
+
+    // 7. Escala os candidatos para o sistema de coordenadas do canvas
+    const scaleFactor = canvas.height / reportCard.scrollHeight;
+    const breakCandidatesCanvas = breakCandidatesDom.map(y => Math.round(y * scaleFactor));
+
+    // 8. Fatia o canvas em páginas A4 com quebra inteligente
+    capturedPdfPages = buildPdfPagesFromCanvas(canvas, breakCandidatesCanvas);
+
+    // 9. Exibe preview no modal
+    renderPdfPreview(capturedPdfPages);
+    document.getElementById('pdfModal').classList.remove('hidden');
+
+    document.getElementById('downloadPdfBtn').onclick = () => {
+      exportPdfFromPages(capturedPdfPages);
+      closePDFModal();
+    };
+
+  } catch (err) {
+    console.error('Erro ao gerar PDF:', err);
+    alert('Não foi possível gerar o PDF. Verifique se a planilha está carregada e tente novamente.');
+  } finally {
+    if (renderShell) renderShell.remove();
+    if (pdfBtn) { pdfBtn.innerHTML = originalBtnHtml; pdfBtn.disabled = false; }
+  }
+}
+
+function closePDFModal() {
+  document.getElementById('pdfModal').classList.add('hidden');
+  capturedPdfPages = [];
+  document.getElementById('downloadPdfBtn').onclick = null;
+}
+
+// Inicialização
+document.addEventListener('DOMContentLoaded', () => {
+  const area = document.getElementById('upload-area');
+  const input = document.getElementById('fileInput');
+  area.addEventListener('click', () => input.click());
+  input.addEventListener('change', e => { if (e.target.files[0]) processarUpload(e.target.files[0]); });
+  area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('border-blue-500', 'bg-blue-500/10'); });
+  area.addEventListener('dragleave', () => area.classList.remove('border-blue-500', 'bg-blue-500/10'));
+  area.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files[0]) processarUpload(e.dataTransfer.files[0]); });
+});
+</script>
+</body>
+</html>
